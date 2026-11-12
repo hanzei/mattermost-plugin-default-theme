@@ -30,7 +30,7 @@ make dist                                      # build the plugin bundle
 - The server only authenticates plugin requests. If you add routes or slash commands that touch data, check the user's permission on that object, on the server; hiding UI is not a check.
 - Anything that changes state uses POST, PUT, PATCH or DELETE. The server's CSRF check doesn't cover GET.
 - Never send internal errors to clients or write secrets or tokens to logs.
-- Don't add dependencies the host or the standard library already provide.
+- Don't add dependencies the host or the standard library already provide. Fix CodeQL alerts instead of adding exclusions to `.github/codeql/codeql-config.yml`; the only one is `go/log-injection`, which the server excludes too.
 - In GitHub workflows, pin third-party actions to a commit SHA with the version in a comment, and start from `permissions: {}`.
 
 ## Pull requests and commits

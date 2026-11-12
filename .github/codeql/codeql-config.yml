@@ -1,0 +1,10 @@
+name: "CodeQL config"
+
+query-filters:
+  - exclude:
+      id: go/log-injection
+
+paths-ignore:
+  - '**/*_test.go'
+  - '**/mocks/**'
+  - server/dist
