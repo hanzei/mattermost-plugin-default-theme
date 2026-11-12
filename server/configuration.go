@@ -2,9 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 
-	"github.com/pkg/errors"
+	"github.com/mattermost/mattermost/server/public/model"
 )
 
 // configuration captures the plugin's external configuration as exposed in the Mattermost server
@@ -20,12 +24,18 @@ import (
 // copy appropriate for your types.
 type configuration struct {
 	CustomTheme string
+	TeamThemes  string
+
+	// customTheme and teamThemes hold the themes as they are saved as preferences, computed in
+	// OnConfigurationChange. teamThemes is keyed by team name.
+	customTheme string
+	teamThemes  map[string]string
 }
 
-// Clone shallow copies the configuration. Your implementation may require a deep copy if
-// your configuration has reference types.
+// Clone deep copies the configuration.
 func (c *configuration) Clone() *configuration {
 	clone := *c
+	clone.teamThemes = maps.Clone(c.teamThemes)
 	return &clone
 }
 
@@ -70,25 +80,69 @@ func (p *Plugin) setConfiguration(configuration *configuration) {
 	p.configuration = configuration
 }
 
-// OnConfigurationChange is invoked when configuration changes may have been made.
+// OnConfigurationChange is invoked when configuration changes may have been made. Invalid
+// themes are skipped and reported in the returned error, which the server logs, so that a mistake
+// in one theme doesn't disable the others.
 func (p *Plugin) OnConfigurationChange() error {
 	configuration := new(configuration)
 
 	// Load the public configuration fields from the Mattermost server configuration.
 	if err := p.API.LoadPluginConfiguration(configuration); err != nil {
-		return errors.Wrap(err, "failed to load plugin configuration")
+		return fmt.Errorf("failed to load plugin configuration: %w", err)
 	}
 
-	theme := configuration.CustomTheme
-	if theme != "" {
-		m := map[string]any{}
-		err := json.Unmarshal([]byte(theme), &m)
+	var errs []error
+
+	if configuration.CustomTheme != "" {
+		theme, err := prepareTheme([]byte(configuration.CustomTheme))
 		if err != nil {
-			return errors.Wrap(err, "error parsing default theme while saving config")
+			errs = append(errs, fmt.Errorf("error parsing default theme while saving config: %w", err))
+		}
+		configuration.customTheme = theme
+	}
+
+	if configuration.TeamThemes != "" {
+		rawThemes := map[string]json.RawMessage{}
+		if err := json.Unmarshal([]byte(configuration.TeamThemes), &rawThemes); err != nil {
+			errs = append(errs, fmt.Errorf("error parsing team themes while saving config: %w", err))
+			rawThemes = nil
+		}
+
+		configuration.teamThemes = make(map[string]string, len(rawThemes))
+		for _, teamName := range slices.Sorted(maps.Keys(rawThemes)) {
+			if !model.IsValidTeamName(teamName) {
+				errs = append(errs, fmt.Errorf("error parsing team themes while saving config: %q is not a valid team name; use the lowercase name from the team URL", teamName))
+				continue
+			}
+			theme, err := prepareTheme(rawThemes[teamName])
+			if err != nil {
+				errs = append(errs, fmt.Errorf("error parsing theme for team %q while saving config: %w", teamName, err))
+				continue
+			}
+			configuration.teamThemes[teamName] = theme
 		}
 	}
 
 	p.setConfiguration(configuration)
 
-	return nil
+	return errors.Join(errs...)
+}
+
+// prepareTheme checks that data is a JSON object with string values, as the server requires for
+// theme preferences. If it has no "type", it's set to "custom", which the webapp needs to show
+// it as a custom theme.
+func prepareTheme(data []byte) (string, error) {
+	var theme map[string]string
+	if err := json.Unmarshal(data, &theme); err != nil {
+		return "", err
+	}
+	if theme == nil {
+		return "", errors.New("theme must be a JSON object")
+	}
+
+	if theme["type"] == "" {
+		theme["type"] = "custom"
+	}
+
+	return model.MapToJSON(theme), nil
 }

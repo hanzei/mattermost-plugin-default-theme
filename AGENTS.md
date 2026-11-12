@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Mattermost plugin that applies an admin-configured theme to every newly created user. It is a server-only Go plugin (`server/`); there is no webapp. Admins paste theme JSON into the `CustomTheme` setting, `OnConfigurationChange` validates it, and `UserHasBeenCreated` saves it as the new user's `theme` preference.
+Mattermost plugin that applies an admin-configured theme to every newly created user. It is a server-only Go plugin (`server/`); there is no webapp. Admins paste theme JSON into the `CustomTheme` setting, `OnConfigurationChange` validates it, and `UserHasBeenCreated` saves it as the new user's `theme` preference. The `TeamThemes` setting maps team names to themes; `UserHasJoinedTeam` saves the matching one as the user's per-team `theme` preference, unless the user has already chosen a theme.
 
 **Before editing `server/`, read `server/AGENTS.md`.**
 
