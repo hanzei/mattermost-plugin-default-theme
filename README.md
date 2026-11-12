@@ -10,4 +10,17 @@ This plugin is used to set the default theme for your users when they create the
 
 When any new account is created, the new user will have their theme set to this value.
 
+### Team themes
+
+You can also set a theme per team in the "Team Themes" setting. Paste a JSON object that maps team names to theme JSON. The team name is the part of the team URL after the site URL, e.g. `engineering` in `https://mattermost.example.com/engineering`:
+
+```json
+{
+  "engineering": {"sidebarBg": "#001e27", "...": "..."},
+  "sales": {"sidebarBg": "#ffffff", "...": "..."}
+}
+```
+
+When a user joins one of these teams, the team's theme is applied for that team. Users who have already chosen a theme of their own, either globally or for that team, keep it. Users can switch back to a single theme for all teams by changing their theme and checking **Apply new theme to all my teams**.
+
 ![image](https://user-images.githubusercontent.com/6913320/112346908-cb634700-8c9c-11eb-9a6a-621a2893c528.png)

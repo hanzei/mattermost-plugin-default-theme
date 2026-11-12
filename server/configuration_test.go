@@ -2,8 +2,10 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
+	"github.com/mattermost/mattermost/server/public/model"
 	"github.com/mattermost/mattermost/server/public/plugin/plugintest"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,6 +28,8 @@ func TestOnConfigurationChangeValidTheme(t *testing.T) {
 
 	config := plugin.getConfiguration()
 	require.Equal(t, config.CustomTheme, theme)
+	prepared := model.MapFromJSON(strings.NewReader(config.customTheme))
+	require.Equal(t, "custom", prepared["type"])
 }
 
 func TestOnConfigurationChangeBlankTheme(t *testing.T) {
@@ -80,4 +84,64 @@ func TestOnConfigurationChangeErrorLoadingConfig(t *testing.T) {
 
 	config := plugin.getConfiguration()
 	require.Equal(t, config.CustomTheme, "")
+}
+
+func TestOnConfigurationChangeTeamThemes(t *testing.T) {
+	for name, tc := range map[string]struct {
+		teamThemes string
+		want       map[string]string
+		wantErr    string
+	}{
+		"blank": {},
+		"valid": {
+			teamThemes: `{"engineering":{"sidebarBg":"#001e27"},"sales":{"sidebarBg":"#ffffff","type":"Onyx"}}`,
+			want: map[string]string{
+				"engineering": `{"sidebarBg":"#001e27","type":"custom"}`,
+				"sales":       `{"sidebarBg":"#ffffff","type":"Onyx"}`,
+			},
+		},
+		"invalid team name": {
+			teamThemes: `{"Engineering":{"sidebarBg":"#001e27"}}`,
+			wantErr:    `error parsing team themes while saving config: "Engineering" is not a valid team name; use the lowercase name from the team URL`,
+		},
+		"non-string theme value": {
+			teamThemes: `{"engineering":{"sidebarBg":"#001e27","opacity":0.5}}`,
+			wantErr:    `error parsing theme for team "engineering" while saving config: json: cannot unmarshal number`,
+		},
+		"invalid JSON": {
+			teamThemes: `{"engineering":`,
+			wantErr:    "error parsing team themes while saving config: unexpected end of JSON input",
+		},
+		"not an object": {
+			teamThemes: `["engineering"]`,
+			wantErr:    "error parsing team themes while saving config: json: cannot unmarshal array",
+		},
+		"theme not an object": {
+			teamThemes: `{"engineering":"#001e27"}`,
+			wantErr:    `error parsing theme for team "engineering" while saving config: json: cannot unmarshal string`,
+		},
+		"null theme": {
+			teamThemes: `{"engineering":null}`,
+			wantErr:    `error parsing theme for team "engineering" while saving config: theme must be a JSON object`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			testAPI := &plugintest.API{}
+			plugin := Plugin{}
+			plugin.SetAPI(testAPI)
+
+			testAPI.On("LoadPluginConfiguration", mock.AnythingOfType("*main.configuration")).Once().Run(func(args mock.Arguments) {
+				args.Get(0).(*configuration).TeamThemes = tc.teamThemes
+			}).Return(nil)
+
+			err := plugin.OnConfigurationChange()
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				require.Nil(t, plugin.getConfiguration().teamThemes)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, plugin.getConfiguration().teamThemes)
+		})
+	}
 }

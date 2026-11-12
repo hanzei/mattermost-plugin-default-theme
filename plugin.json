@@ -26,6 +26,14 @@
                 "type": "longtext",
                 "help_text": "Custom Theme JSON",
                 "default": ""
+            },
+            {
+                "key": "TeamThemes",
+                "display_name": "Team Themes",
+                "type": "longtext",
+                "help_text": "JSON object mapping team names to theme JSON. The team name is the part of the team URL after the site URL, e.g. \"engineering\" in https://mattermost.example.com/engineering. When a user joins one of these teams, the theme is applied for that team, unless the user has already chosen a theme of their own.",
+                "placeholder": "{\"engineering\": {\"sidebarBg\": \"#001e27\", ...}, \"sales\": {...}}",
+                "default": ""
             }
         ]
     }
