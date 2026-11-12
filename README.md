@@ -23,4 +23,6 @@ You can also set a theme per team in the "Team Themes" setting. Paste a JSON obj
 
 When a user joins one of these teams, the team's theme is applied for that team. Users who have already chosen a theme of their own, either globally or for that team, keep it. Users can switch back to a single theme for all teams by changing their theme and checking **Apply new theme to all my teams**.
 
+If a theme or team name is invalid, that entry is skipped and the error is written to the server log; the other themes still apply. Team names must be the lowercase name from the team URL, not the display name.
+
 ![image](https://user-images.githubusercontent.com/6913320/112346908-cb634700-8c9c-11eb-9a6a-621a2893c528.png)

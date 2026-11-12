@@ -61,14 +61,16 @@ func TestOnConfigurationChangeInvalidTheme(t *testing.T) {
 	testAPI.On("LoadPluginConfiguration", mock.AnythingOfType("*main.configuration")).Run(func(args mock.Arguments) {
 		config := args.Get(0).(*configuration)
 		config.CustomTheme = theme
+		config.TeamThemes = `{"engineering":{"sidebarBg":"#001e27"}}`
 	}).Once().Return(nil)
 
 	err := plugin.OnConfigurationChange()
-	require.NotNil(t, err)
-	require.Equal(t, err.Error(), "error parsing default theme while saving config: unexpected end of JSON input")
+	require.EqualError(t, err, "error parsing default theme while saving config: unexpected end of JSON input")
 
+	// The invalid default theme is skipped; team themes still apply.
 	config := plugin.getConfiguration()
-	require.Equal(t, config.CustomTheme, "")
+	require.Empty(t, config.customTheme)
+	require.Equal(t, map[string]string{"engineering": `{"sidebarBg":"#001e27","type":"custom"}`}, config.teamThemes)
 }
 
 func TestOnConfigurationChangeErrorLoadingConfig(t *testing.T) {
@@ -90,7 +92,7 @@ func TestOnConfigurationChangeTeamThemes(t *testing.T) {
 	for name, tc := range map[string]struct {
 		teamThemes string
 		want       map[string]string
-		wantErr    string
+		wantErrs   []string
 	}{
 		"blank": {},
 		"valid": {
@@ -100,29 +102,33 @@ func TestOnConfigurationChangeTeamThemes(t *testing.T) {
 				"sales":       `{"sidebarBg":"#ffffff","type":"Onyx"}`,
 			},
 		},
-		"invalid team name": {
-			teamThemes: `{"Engineering":{"sidebarBg":"#001e27"}}`,
-			wantErr:    `error parsing team themes while saving config: "Engineering" is not a valid team name; use the lowercase name from the team URL`,
-		},
-		"non-string theme value": {
-			teamThemes: `{"engineering":{"sidebarBg":"#001e27","opacity":0.5}}`,
-			wantErr:    `error parsing theme for team "engineering" while saving config: json: cannot unmarshal number`,
+		"invalid entries are skipped": {
+			teamThemes: `{"engineering":{"sidebarBg":"#001e27"},"Sales":{"sidebarBg":"#ffffff"},"support":{"sidebarBg":"#001e27","opacity":0.5}}`,
+			want:       map[string]string{"engineering": `{"sidebarBg":"#001e27","type":"custom"}`},
+			wantErrs: []string{
+				`error parsing team themes while saving config: "Sales" is not a valid team name; use the lowercase name from the team URL`,
+				`error parsing theme for team "support" while saving config: json: cannot unmarshal number`,
+			},
 		},
 		"invalid JSON": {
 			teamThemes: `{"engineering":`,
-			wantErr:    "error parsing team themes while saving config: unexpected end of JSON input",
+			want:       map[string]string{},
+			wantErrs:   []string{"error parsing team themes while saving config: unexpected end of JSON input"},
 		},
 		"not an object": {
 			teamThemes: `["engineering"]`,
-			wantErr:    "error parsing team themes while saving config: json: cannot unmarshal array",
+			want:       map[string]string{},
+			wantErrs:   []string{"error parsing team themes while saving config: json: cannot unmarshal array"},
 		},
 		"theme not an object": {
 			teamThemes: `{"engineering":"#001e27"}`,
-			wantErr:    `error parsing theme for team "engineering" while saving config: json: cannot unmarshal string`,
+			want:       map[string]string{},
+			wantErrs:   []string{`error parsing theme for team "engineering" while saving config: json: cannot unmarshal string`},
 		},
 		"null theme": {
 			teamThemes: `{"engineering":null}`,
-			wantErr:    `error parsing theme for team "engineering" while saving config: theme must be a JSON object`,
+			want:       map[string]string{},
+			wantErrs:   []string{`error parsing theme for team "engineering" while saving config: theme must be a JSON object`},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -131,17 +137,23 @@ func TestOnConfigurationChangeTeamThemes(t *testing.T) {
 			plugin.SetAPI(testAPI)
 
 			testAPI.On("LoadPluginConfiguration", mock.AnythingOfType("*main.configuration")).Once().Run(func(args mock.Arguments) {
-				args.Get(0).(*configuration).TeamThemes = tc.teamThemes
+				config := args.Get(0).(*configuration)
+				config.CustomTheme = `{"sidebarBg":"#ffffff"}`
+				config.TeamThemes = tc.teamThemes
 			}).Return(nil)
 
 			err := plugin.OnConfigurationChange()
-			if tc.wantErr != "" {
-				require.ErrorContains(t, err, tc.wantErr)
-				require.Nil(t, plugin.getConfiguration().teamThemes)
-				return
+			if len(tc.wantErrs) == 0 {
+				require.NoError(t, err)
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.want, plugin.getConfiguration().teamThemes)
+			for _, wantErr := range tc.wantErrs {
+				require.ErrorContains(t, err, wantErr)
+			}
+
+			config := plugin.getConfiguration()
+			require.Equal(t, tc.want, config.teamThemes)
+			// Invalid team themes don't affect the default theme.
+			require.Equal(t, `{"sidebarBg":"#ffffff","type":"custom"}`, config.customTheme)
 		})
 	}
 }

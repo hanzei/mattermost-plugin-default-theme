@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 
 	"github.com/mattermost/mattermost/server/public/model"
-	"github.com/pkg/errors"
 )
 
 // configuration captures the plugin's external configuration as exposed in the Mattermost server
@@ -78,19 +80,23 @@ func (p *Plugin) setConfiguration(configuration *configuration) {
 	p.configuration = configuration
 }
 
-// OnConfigurationChange is invoked when configuration changes may have been made.
+// OnConfigurationChange is invoked when configuration changes may have been made. Invalid
+// themes are skipped and reported in the returned error, which the server logs, so that a mistake
+// in one theme doesn't disable the others.
 func (p *Plugin) OnConfigurationChange() error {
 	configuration := new(configuration)
 
 	// Load the public configuration fields from the Mattermost server configuration.
 	if err := p.API.LoadPluginConfiguration(configuration); err != nil {
-		return errors.Wrap(err, "failed to load plugin configuration")
+		return fmt.Errorf("failed to load plugin configuration: %w", err)
 	}
+
+	var errs []error
 
 	if configuration.CustomTheme != "" {
 		theme, err := prepareTheme([]byte(configuration.CustomTheme))
 		if err != nil {
-			return errors.Wrap(err, "error parsing default theme while saving config")
+			errs = append(errs, fmt.Errorf("error parsing default theme while saving config: %w", err))
 		}
 		configuration.customTheme = theme
 	}
@@ -98,17 +104,20 @@ func (p *Plugin) OnConfigurationChange() error {
 	if configuration.TeamThemes != "" {
 		rawThemes := map[string]json.RawMessage{}
 		if err := json.Unmarshal([]byte(configuration.TeamThemes), &rawThemes); err != nil {
-			return errors.Wrap(err, "error parsing team themes while saving config")
+			errs = append(errs, fmt.Errorf("error parsing team themes while saving config: %w", err))
+			rawThemes = nil
 		}
 
 		configuration.teamThemes = make(map[string]string, len(rawThemes))
-		for teamName, rawTheme := range rawThemes {
+		for _, teamName := range slices.Sorted(maps.Keys(rawThemes)) {
 			if !model.IsValidTeamName(teamName) {
-				return errors.Errorf("error parsing team themes while saving config: %q is not a valid team name; use the lowercase name from the team URL", teamName)
+				errs = append(errs, fmt.Errorf("error parsing team themes while saving config: %q is not a valid team name; use the lowercase name from the team URL", teamName))
+				continue
 			}
-			theme, err := prepareTheme(rawTheme)
+			theme, err := prepareTheme(rawThemes[teamName])
 			if err != nil {
-				return errors.Wrapf(err, "error parsing theme for team %q while saving config", teamName)
+				errs = append(errs, fmt.Errorf("error parsing theme for team %q while saving config: %w", teamName, err))
+				continue
 			}
 			configuration.teamThemes[teamName] = theme
 		}
@@ -116,7 +125,7 @@ func (p *Plugin) OnConfigurationChange() error {
 
 	p.setConfiguration(configuration)
 
-	return nil
+	return errors.Join(errs...)
 }
 
 // prepareTheme checks that data is a JSON object with string values, as the server requires for
