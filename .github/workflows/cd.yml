@@ -1,0 +1,15 @@
+name: cd
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  plugin-cd:
+    # Builds the plugin and creates the GitHub release for the tag, with the generated
+    # release notes and the plugin bundle.
+    permissions:
+      contents: write
+    uses: mattermost/actions-workflows/.github/workflows/community-plugin-cd.yml@6e3b523f38c8286c412fe5bef5261841e82f9dc7
