@@ -4,8 +4,6 @@
     "description": "Apply a custom theme to all users when they create their account.",
     "homepage_url": "https://github.com/hanzei/mattermost-plugin-default-theme",
     "support_url": "https://github.com/hanzei/mattermost-plugin-default-theme/issues",
-    "release_notes_url": "https://github.com/hanzei/mattermost-plugin-default-theme/releases/tag/v0.1.0",
-    "version": "0.1.0",
     "min_server_version": "11.7.0",
     "server": {
         "executables": {
