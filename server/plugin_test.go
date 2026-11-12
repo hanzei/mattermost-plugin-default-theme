@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/mattermost/mattermost-server/v5/model"
-	"github.com/mattermost/mattermost-server/v5/plugin/plugintest"
+	"github.com/mattermost/mattermost/server/public/model"
+	"github.com/mattermost/mattermost/server/public/plugin/plugintest"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -70,7 +70,7 @@ func TestUserHasBeenCreatedInvalidTheme(t *testing.T) {
 		Id: "userid",
 	}
 
-	testAPI.On("LogError", "error parsing theme during user creation: unexpected end of JSON input").Once()
+	testAPI.On("LogError", "Failed to parse theme during user creation", "err", "unexpected end of JSON input").Once()
 	plugin.UserHasBeenCreated(nil, user)
 }
 
@@ -89,6 +89,6 @@ func TestUserHasBeenCreatedErrorSettingPreferences(t *testing.T) {
 	}
 
 	testAPI.On("UpdatePreferencesForUser", mock.AnythingOfType("string"), mock.AnythingOfType("[]model.Preference")).Once().Return(&model.AppError{Message: "preference error"})
-	testAPI.On("LogError", "error setting preferences for user userid. err=: preference error, ").Once()
+	testAPI.On("LogError", "Failed to set theme preference for user", "user_id", "userid", "err", "preference error").Once()
 	plugin.UserHasBeenCreated(nil, user)
 }

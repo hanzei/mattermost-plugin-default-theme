@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 
-	"github.com/mattermost/mattermost-server/v5/model"
-	"github.com/mattermost/mattermost-server/v5/plugin"
+	"github.com/mattermost/mattermost/server/public/model"
+	"github.com/mattermost/mattermost/server/public/plugin"
 )
 
 // Plugin implements the interface expected by the Mattermost server to communicate between the server and plugin processes.
@@ -28,16 +27,16 @@ func (p *Plugin) UserHasBeenCreated(c *plugin.Context, user *model.User) {
 		return
 	}
 
-	m := map[string]interface{}{}
+	m := map[string]any{}
 	err := json.Unmarshal([]byte(theme), &m)
 	if err != nil {
-		p.API.LogError("error parsing theme during user creation: " + err.Error())
+		p.API.LogError("Failed to parse theme during user creation", "err", err.Error())
 		return
 	}
 
 	pref := model.Preference{
 		UserId:   user.Id,
-		Category: model.PREFERENCE_CATEGORY_THEME,
+		Category: model.PreferenceCategoryTheme,
 		Name:     "",
 		Value:    theme,
 	}
@@ -45,8 +44,7 @@ func (p *Plugin) UserHasBeenCreated(c *plugin.Context, user *model.User) {
 
 	appErr := p.API.UpdatePreferencesForUser(user.Id, prefs)
 	if appErr != nil {
-		errString := fmt.Sprintf("error setting preferences for user %s. err=%s", user.Id, appErr.Error())
-		p.API.LogError(errString)
+		p.API.LogError("Failed to set theme preference for user", "user_id", user.Id, "err", appErr.Error())
 	}
 }
 
