@@ -6,7 +6,7 @@
     "support_url": "https://github.com/hanzei/mattermost-plugin-default-theme/issues",
     "release_notes_url": "https://github.com/hanzei/mattermost-plugin-default-theme/releases/tag/v0.1.0",
     "version": "0.1.0",
-    "min_server_version": "5.26.0",
+    "min_server_version": "11.7.0",
     "server": {
         "executables": {
             "linux-amd64": "server/dist/plugin-linux-amd64",
