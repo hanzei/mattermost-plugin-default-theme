@@ -20,7 +20,7 @@ make dist                                      # build the plugin bundle
 
 ## Architecture
 
-- `plugin.json` is the source of truth for ID and settings. The version and release notes URL come from the git tag (`make patch`, `make minor`, `make major`), so don't add `version` or `release_notes_url` to it. `make apply` generates `server/manifest.go` from it; it's gitignored, so never edit it. Never edit `dist/` or `server/dist/`.
+- `plugin.json` is the source of truth for ID and settings. The version and release notes URL come from the git tag (`make patch`, `make minor`, `make major`), so don't add `version` or `release_notes_url` to it. Pushing a `v*` tag runs `.github/workflows/cd.yml`, which builds the plugin and publishes the GitHub release with the generated release notes and the bundle; edit the notes on GitHub afterwards if needed. `make apply` generates `server/manifest.go` from it; it's gitignored, so never edit it. Never edit `dist/` or `server/dist/`.
 - Project-specific make targets go in `build/custom.mk`.
 - Build tooling (`Makefile`, `build/`, `.golangci.yml`, `.github/workflows/ci.yml`) is synced from [mattermost-plugin-starter-template](https://github.com/mattermost/mattermost-plugin-starter-template). Keep local changes to those files minimal so future syncs stay easy.
 - `min_server_version` is 11.7.0, the oldest supported ESR. Don't use plugin API methods newer than that without bumping it.
